@@ -1,4 +1,4 @@
-name: jira
+name: change-audit
 
 on:
   workflow_dispatch:
