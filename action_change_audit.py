@@ -2,11 +2,11 @@
 
 from datetime import datetime
 from typing import Any
-
-from github import Github, UnknownObjectException
+from github import Github, UnknownObjectException, RateLimitExceededException
 import csv
 import concurrent.futures
 import os
+import time
 
 # Set your GitHub repository details
 GITHUB_REPO = os.environ.get('GITHUB_REPO')
@@ -18,21 +18,34 @@ START_DATE = os.environ.get('START_DATE')  # Format: YYYY-MM-DD
 END_DATE = os.environ.get('END_DATE')  # Format: YYYY-MM-DD
 
 # Initialize GitHub API client
-g = Github(GITHUB_TOKEN)
+g = Github(GITHUB_TOKEN, per_page=100)  # Use higher page size for efficiency
 repo = g.get_repo(GITHUB_REPO)
+
+
+def handle_rate_limit():
+    """Handles GitHub rate limits by waiting and retrying."""
+    while True:
+        rate_limit = g.get_rate_limit().core
+        if rate_limit.remaining > 0:
+            return
+        reset_time = (rate_limit.reset - datetime.utcnow()).total_seconds()
+        print(f"Rate limit exceeded! Sleeping for {int(reset_time)} seconds...")
+        time.sleep(reset_time + 1)  # Sleep until reset
 
 
 def get_merge_commits(starting_date: Any, ending_date: Any) -> list:
     """Fetch merge commits within the given date range that modified files in TARGET_DIRECTORY."""
     print("Fetching merge commits...")
 
-    # Get all merge commits within the date range
-    commits = [
-        commit for commit in repo.get_commits(since=starting_date, until=ending_date)
-        if len(commit.commit.parents) > 1  # Only merge commits
-    ]
+    try:
+        commits = [
+            commit for commit in repo.get_commits(since=starting_date, until=ending_date)
+            if len(commit.commit.parents) > 1  # Only merge commits
+        ]
+    except RateLimitExceededException:
+        handle_rate_limit()
+        return get_merge_commits(starting_date, ending_date)
 
-    # Filter commits that modified TARGET_DIRECTORY
     filtered_commits = []
     for commit in commits:
         if check_commit_changes(commit):
@@ -43,24 +56,35 @@ def get_merge_commits(starting_date: Any, ending_date: Any) -> list:
 
 
 def check_commit_changes(commit):
-    """Check if a commit modified files in the TARGET_DIRECTORY.  Also, include *.tf files in WORKING_DIRECTORY"""
+    """Check if a commit modified files in the TARGET_DIRECTORY. Also include *.tf files in WORKING_DIRECTORY."""
     try:
-        return commit if any(f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}") or f.filename.endswith(".tf") for f in commit.files) else None
+        return commit if any(
+            f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}") or f.filename.endswith(".tf")
+            for f in commit.files
+        ) else None
     except UnknownObjectException:
         return None  # Handle edge cases where commit data is missing
 
 
 def find_prs_for_commits(merge_commits: list) -> dict:
-    """Find PRs for merge commits in a single batch call to speed up execution."""
+    """Find PRs for merge commits efficiently, handling rate limits."""
     print("Fetching PRs for merge commits...")
 
-    merged_prs = {pr.merge_commit_sha: pr for pr in repo.get_pulls(state="closed", sort="updated", direction="desc")}
-    return {commit.sha: merged_prs.get(commit.sha) for commit in merge_commits}
+    try:
+        merged_prs = {pr.merge_commit_sha: pr for pr in repo.get_pulls(state="closed", sort="updated", direction="desc")}
+        return {commit.sha: merged_prs.get(commit.sha) for commit in merge_commits}
+    except RateLimitExceededException:
+        handle_rate_limit()
+        return find_prs_for_commits(merge_commits)
 
 
 def get_pr_approval_status(pr: Any) -> bool:
     """Check if a pull request was approved."""
-    return any(review.state == "APPROVED" for review in pr.get_reviews())
+    try:
+        return any(review.state == "APPROVED" for review in pr.get_reviews())
+    except RateLimitExceededException:
+        handle_rate_limit()
+        return get_pr_approval_status(pr)
 
 
 def process_commits(merge_commits: list) -> tuple:
@@ -74,7 +98,6 @@ def process_commits(merge_commits: list) -> tuple:
             unapproved_prs.append(pr.number)
             print(f"WARNING: PR #{pr.number} modified production files but was NOT approved!")
 
-    # Use threading to process PRs faster
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(check_commit, merge_commits)
 
@@ -122,3 +145,4 @@ if __name__ == "__main__":
     start_date = datetime.strptime(START_DATE, "%Y-%m-%d")
     end_date = datetime.strptime(END_DATE, "%Y-%m-%d")
     main(start_date, end_date)
+
