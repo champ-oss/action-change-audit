@@ -1,7 +1,14 @@
-name: change-audit
+name: action-change-audit
 
 on:
   workflow_dispatch:
+    inputs:
+      start-date:
+        required: true
+        description: 'Start date for the audit: YYYY-MM-DD'
+      end-date:
+        required: true
+        description: 'End date for the audit: YYYY-MM-DD'
 
 concurrency: this
 
@@ -19,6 +26,11 @@ jobs:
           TARGET_DIRECTORY: 'src/prod'
           GITHUB_REPO: 'org/repo'
           WORKING_DIRECTORY: '.'
-          REPORT_FILE: 'report.csv'
-          START_DATE: '2025-02-01'
-          END_DATE: '2025-02-28'
+          REPORT_FILE: '${{ github.event.inputs.start-date }}-report.csv'
+          START_DATE: ${{ github.event.inputs.start-date }}
+          END_DATE: ${{ github.event.inputs.end-date }}
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: '${{ github.event.inputs.start-date }}-report'
+          path: '${{ github.event.inputs.start-date }}-report.csv'
