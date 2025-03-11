@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from github import Github
+from github import Github, UnknownObjectException
 import csv
 import concurrent.futures
 import os
@@ -42,9 +42,12 @@ def get_merge_commits(starting_date: Any, ending_date: Any) -> list:
     return filtered_commits
 
 
-def check_commit_changes(commit: Any) -> bool:
-    """Check if a commit modified files in the TARGET_DIRECTORY."""
-    return any(f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}") for f in commit.files)
+def check_commit_changes(commit):
+    """Check if a commit modified files in the TARGET_DIRECTORY.  Also, include *.tf files in WORKING_DIRECTORY"""
+    try:
+        return commit if any(f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}") or f.filename.endswith(".tf") for f in commit.files) else None
+    except UnknownObjectException:
+        return None  # Handle edge cases where commit data is missing
 
 
 def find_prs_for_commits(merge_commits: list) -> dict:
