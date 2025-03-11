@@ -79,16 +79,31 @@ def process_commits(merge_commits: list) -> tuple:
 
 
 def generate_report(total_merged: int, unapproved_prs: list) -> None:
-    """Generate a CSV report only for PRs modifying TARGET_DIRECTORY."""
+    """Generate a detailed CSV report with structured formatting."""
     with open(REPORT_FILE, mode="w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=["Total Merged PRs", "Total Unapproved PRs", "Unapproved PR Numbers"])
-        writer.writeheader()
-        writer.writerow({
-            "Total Merged PRs": total_merged,
-            "Total Unapproved PRs": len(unapproved_prs),
-            "Unapproved PR Numbers": ", ".join(map(str, unapproved_prs))
-        })
-    print(f"Report saved as {REPORT_FILE}")
+        writer = csv.writer(file)
+
+        # Report header
+        writer.writerow(["GitHub Repository", GITHUB_REPO])
+        writer.writerow(["Target Directory", TARGET_DIRECTORY])
+        writer.writerow(["Start Date", START_DATE])
+        writer.writerow(["End Date", END_DATE])
+        writer.writerow([])
+
+        # Summary Section
+        writer.writerow(["Summary"])
+        writer.writerow(["Total Merged PRs", total_merged])
+        writer.writerow(["Total Unapproved PRs", len(unapproved_prs)])
+        writer.writerow([])
+
+        # Detailed Unapproved PR Section
+        writer.writerow(["Unapproved PRs"])
+        writer.writerow(["PR Number"])  # Column Header
+
+        for pr in unapproved_prs:
+            writer.writerow([pr])  # Each PR on its own row
+
+    print(f"Detailed Report saved as {REPORT_FILE}")
 
 
 def main(starting_date: Any, ending_date: Any) -> None:
