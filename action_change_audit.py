@@ -105,7 +105,7 @@ def process_commits(merge_commits: list) -> tuple:
 
 
 def generate_report(total_merged: int, unapproved_prs: list) -> None:
-    """Generate a detailed CSV report with structured formatting."""
+    """Generate a detailed CSV report with PR links for unapproved PRs."""
     with open(REPORT_FILE, mode="w", newline="") as file:
         writer = csv.writer(file)
 
@@ -124,10 +124,11 @@ def generate_report(total_merged: int, unapproved_prs: list) -> None:
 
         # Detailed Unapproved PR Section
         writer.writerow(["Unapproved PRs"])
-        writer.writerow(["PR Number"])  # Column Header
+        writer.writerow(["PR Number", "PR Link"])  # Column Headers
 
         for pr in unapproved_prs:
-            writer.writerow([pr])  # Each PR on its own row
+            pr_link = f"https://github.com/{GITHUB_REPO}/pull/{pr}"
+            writer.writerow([pr, pr_link])  # Each PR with a link
 
     print(f"Detailed Report saved as {REPORT_FILE}")
 
