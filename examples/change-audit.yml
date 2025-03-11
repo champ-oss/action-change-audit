@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: action-change-audit
-        uses: champ-oss/action-jira-notification@main
+        uses: champ-oss/action-change-audit@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_DIRECTORY: 'src/prod'
