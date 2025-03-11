@@ -9,7 +9,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  jira:
+  change-audit:
     runs-on: ubuntu-latest
     steps:
       - name: action-change-audit
