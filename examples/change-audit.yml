@@ -1,0 +1,24 @@
+name: jira
+
+on:
+  workflow_dispatch:
+
+concurrency: this
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  jira:
+    runs-on: ubuntu-latest
+    steps:
+      - name: action-change-audit
+        uses: champ-oss/action-jira-notification@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_DIRECTORY: 'src/prod'
+          GITHUB_REPO: 'org/repo'
+          WORKING_DIRECTORY: '.'
+          REPORT_FILE: 'report.csv'
+          START_DATE: '2025-02-01'
+          END_DATE: '2025-02-28'
