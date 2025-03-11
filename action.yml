@@ -1,0 +1,44 @@
+name: action-change-audit
+description: https://github.com/champ-oss/action-change-audit
+inputs:
+  GITHUB_REPO:
+    description: 'github repo'
+    required: true
+  GITHUB_TOKEN:
+    description: 'token used to auth with github'
+    required: true
+  TARGET_DIRECTORY:
+    description: 'directory to scan'
+    required: true
+  WORKING_DIRECTORY:
+    description: 'working directory'
+    required: true
+    default: '.'
+  REPORT_FILE:
+    description: 'report file'
+    required: true
+    default: 'report.csv'
+  START_DATE:
+    description: 'start date'
+    required: true
+  END_DATE:
+    description: 'end date'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: install gh libs
+      shell: bash
+      run: cd ${{github.action_path}} && pip3 install -r requirements.txt
+    - name: run python script
+      shell: bash
+      env:
+        GITHUB_REPO: ${{ inputs.GITHUB_REPO }}
+        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+        TARGET_DIRECTORY: ${{ inputs.TARGET_DIRECTORY }}
+        WORKING_DIRECTORY: ${{ inputs.WORKING_DIRECTORY }}
+        REPORT_FILE: ${{ inputs.REPORT_FILE }}
+        START_DATE: ${{ inputs.START_DATE }}
+        END_DATE: ${{ inputs.END_DATE }}
+      run: |
+        python ${GITHUB_ACTION_PATH}/action_change_audit.py
