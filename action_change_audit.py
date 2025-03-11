@@ -59,7 +59,7 @@ def check_commit_changes(commit):
     """Check if a commit modified files in the TARGET_DIRECTORY. Also include *.tf files in WORKING_DIRECTORY."""
     try:
         return commit if any(
-            f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}") or f.filename.endswith(".tf")
+            f.filename.startswith(f"{WORKING_DIRECTORY}/{TARGET_DIRECTORY}")
             for f in commit.files
         ) else None
     except UnknownObjectException:
