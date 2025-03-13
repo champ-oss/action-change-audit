@@ -71,7 +71,8 @@ def find_prs_for_commits(merge_commits: list) -> dict:
     print("Fetching PRs for merge commits...")
 
     try:
-        merged_prs = {pr.merge_commit_sha: pr for pr in repo.get_pulls(state="closed", sort="updated", direction="desc")}
+        merged_prs = {pr.merge_commit_sha: pr for pr in
+                      repo.get_pulls(state="closed", sort="updated", direction="desc")}
         return {commit.sha: merged_prs.get(commit.sha) for commit in merge_commits}
     except RateLimitExceededException:
         handle_rate_limit()
@@ -88,24 +89,30 @@ def get_pr_approval_status(pr: Any) -> bool:
 
 
 def process_commits(merge_commits: list) -> tuple:
-    """Process commits concurrently and only consider those that modified TARGET_DIRECTORY."""
+    """Process commits concurrently and categorize PRs into approved and unapproved."""
     pr_data = find_prs_for_commits(merge_commits)
     unapproved_prs = []
+    approved_prs = []
 
     def check_commit(commit):
         pr = pr_data.get(commit.sha)
-        if pr and not get_pr_approval_status(pr):
-            unapproved_prs.append(pr.number)
-            print(f"WARNING: PR #{pr.number} modified production files but was NOT approved!")
+        if pr:
+            if get_pr_approval_status(pr):
+                approved_prs.append(pr.number)
+            else:
+                unapproved_prs.append(pr.number)
+                print(f"WARNING: PR #{pr.number} modified production files but was NOT approved!")
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(check_commit, merge_commits)
 
-    return len(merge_commits), unapproved_prs
+    return unapproved_prs, approved_prs
 
 
-def generate_report(total_merged: int, unapproved_prs: list) -> None:
-    """Generate a detailed CSV report with PR links for unapproved PRs."""
+def generate_report(unapproved_prs: list, approved_prs: list) -> None:
+    """Generate a detailed CSV report with PR links for approved and unapproved PRs."""
+    total_merged = len(unapproved_prs) + len(approved_prs)
+
     with open(REPORT_FILE, mode="w", newline="") as file:
         writer = csv.writer(file)
 
@@ -120,15 +127,23 @@ def generate_report(total_merged: int, unapproved_prs: list) -> None:
         writer.writerow(["Summary"])
         writer.writerow(["Total Merged PRs", total_merged])
         writer.writerow(["Total Unapproved PRs", len(unapproved_prs)])
+        writer.writerow(["Total Approved PRs", len(approved_prs)])
         writer.writerow([])
 
         # Detailed Unapproved PR Section
         writer.writerow(["Unapproved PRs"])
         writer.writerow(["PR Number", "PR Link"])  # Column Headers
-
         for pr in unapproved_prs:
             pr_link = f"https://github.com/{GITHUB_REPO}/pull/{pr}"
             writer.writerow([pr, pr_link])  # Each PR with a link
+
+        # Detailed Approved PR Section
+        writer.writerow([])
+        writer.writerow(["Approved PRs"])
+        writer.writerow(["PR Number", "PR Link"])  # Column Headers
+        for pr in approved_prs:
+            pr_link = f"https://github.com/{GITHUB_REPO}/pull/{pr}"
+            writer.writerow([pr, pr_link])
 
     print(f"Detailed Report saved as {REPORT_FILE}")
 
@@ -137,13 +152,12 @@ def main(starting_date: Any, ending_date: Any) -> None:
     print(f"Fetching merge commits from {starting_date} to {ending_date} affecting {TARGET_DIRECTORY}...")
 
     merge_commits = get_merge_commits(starting_date, ending_date)
-    total_merged, unapproved_prs = process_commits(merge_commits)
+    unapproved_prs, approved_prs = process_commits(merge_commits)
 
-    generate_report(total_merged, unapproved_prs)
+    generate_report(unapproved_prs, approved_prs)
 
 
 if __name__ == "__main__":
     start_date = datetime.strptime(START_DATE, "%Y-%m-%d")
     end_date = datetime.strptime(END_DATE, "%Y-%m-%d")
     main(start_date, end_date)
-
